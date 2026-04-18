@@ -191,7 +191,7 @@
     gapi.load('client',initGapiClient);
   };
   function initGapiClient(){
-    gapi.client.init({apiKey:API_KEY,discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']}).then(()=>{
+    gapi.client.init({apiKey:API_KEY}).then(()=>gapi.client.load('calendar','v3')).then(()=>{
       tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:(resp)=>{
         if(resp.error){showToast('認証エラー: '+resp.error);return;}
         isSignedIn=true;updateAuthBtn();loadEvents();
