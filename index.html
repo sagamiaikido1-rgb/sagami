@@ -172,9 +172,10 @@
       <button class="dojo-chip samukawa active"  onclick="filterListDojo('寒川',this)">寒川</button>
       <button class="dojo-chip fujisawa active"  onclick="filterListDojo('藤沢',this)">藤沢</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button id="selectAllBtn" onclick="toggleSelectAll()">全選択</button>
       <button id="deleteSelectedBtn" onclick="deleteSelected()">🗑 選択を削除</button>
+      <button id="pastToggleBtn" onclick="togglePast()" style="background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;margin-left:auto">📅 過去も表示</button>
     </div>
     <div id="eventList"><div class="login-notice"><p>ログインすると予定が表示されます</p></div></div>
   </div>
@@ -228,7 +229,7 @@
     {dojo:'寒川',  day:6,start:'12:30',end:'14:30'},
   ];
   let tokenClient,isSignedIn=false,currentYear=new Date().getFullYear(),currentMonth=new Date().getMonth();
-  let allEvents=[],activeFilter='all',listFilter='all',selectedDojo='茅ヶ崎',bulkPreviewEvents=[];
+  let allEvents=[],activeFilter='all',listFilter='all',selectedDojo='茅ヶ崎',bulkPreviewEvents=[],showPast=false;
   window.onload=function(){
     const t=new Date(),m=String(t.getMonth()+1).padStart(2,'0'),d=String(t.getDate()).padStart(2,'0');
     document.getElementById('bulkMonth').value=`${t.getFullYear()}-${m}`;
@@ -306,25 +307,35 @@
     }
   }
 
+  function togglePast(){
+    showPast=!showPast;
+    const btn=document.getElementById('pastToggleBtn');
+    btn.style.background=showPast?'#fef3c7':'var(--surface)';
+    btn.style.color=showPast?'#92400e':'var(--text2)';
+    btn.style.borderColor=showPast?'#f59e0b':'var(--border)';
+    btn.textContent=showPast?'📅 未来のみ表示':'📅 過去も表示';
+    renderEventList();
+  }
   function renderEventList(){
     const container=document.getElementById('eventList');
     if(!isSignedIn){container.innerHTML='<div class="login-notice"><p>ログインすると予定が表示されます</p></div>';return;}
     const now=new Date().toISOString().substr(0,10);
-    let events=allEvents.filter(e=>(e.start.dateTime||e.start.date||'')>=now);
+    let events=showPast?[...allEvents]:allEvents.filter(e=>(e.start.dateTime||e.start.date||'')>=now);
     if(listFilter!=='all')events=events.filter(e=>(e.summary||'').includes(listFilter));
+    events.sort((a,b)=>(a.start.dateTime||a.start.date||'').localeCompare(b.start.dateTime||b.start.date||''));
     if(!events.length){container.innerHTML='<div class="login-notice"><p>予定がありません</p></div>';return;}
     container.innerHTML=events.map(ev=>{
       const title=ev.summary||'(無題)',dojoName=Object.keys(DOJO_CLASS).find(d=>title.includes(d));
       const cls=dojoName?DOJO_CLASS[dojoName]:'special';
       const start=ev.start.dateTime||ev.start.date||'',dateStr=start.substr(0,10),timeStr=ev.start.dateTime?ev.start.dateTime.substr(11,5):'終日';
-      // 種別を抽出：通常=タイトルの道場名後、特別=タイトルそのもの
-      const eventType=dojoName?title.replace(`${dojoName}道場　`,''):title;
-      // 表示名：通常=フルタイトル、特別=種別＋メモ
+      const isPast=dateStr<now;
+      const eventType=dojoName?title.replace(`${dojoName}道場　`,'').replace(`${dojoName} `,''):title;
       const memo=(ev.description||'').trim();
       const dispName=dojoName?title:(memo?`${eventType}　${memo}`:eventType);
       const typeBadge=`<span style="background:#f0f0f0;color:#555;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;flex-shrink:0">${eventType}</span>`;
       const dojoBadge=dojoName?`<span class="dojo-chip ${cls}" style="flex-shrink:0;opacity:1">${dojoName}</span>`:`<span class="dojo-chip special" style="flex-shrink:0;opacity:1;background:#fef08a;color:#713f12">行事</span>`;
-      return `<div class="event-list-item"><input type="checkbox" data-id="${ev.id}">${dojoBadge}${typeBadge}<div class="event-list-info"><div class="etitle">${dispName}</div><div class="etime">${dateStr} ${timeStr}</div></div><button class="btn-danger" onclick="deleteSingle('${ev.id}')">削除</button></div>`;
+      const pastStyle=isPast?'opacity:0.55;':'';
+      return `<div class="event-list-item" style="${pastStyle}"><input type="checkbox" data-id="${ev.id}">${dojoBadge}${typeBadge}<div class="event-list-info"><div class="etitle">${dispName}</div><div class="etime">${dateStr} ${timeStr}${isPast?' 〔済〕':''}</div></div><button class="btn-danger" onclick="deleteSingle('${ev.id}')">削除</button></div>`;
     }).join('');
   }
   function filterListDojo(dojo,btn){listFilter=dojo;document.querySelectorAll('#tab-list .dojo-filter .dojo-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderEventList();}
